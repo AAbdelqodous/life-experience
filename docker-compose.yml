@@ -1,0 +1,31 @@
+services:
+  postgres:
+    container_name: postgres-sql-experience
+    image: postgres
+    environment:
+      POSTGRES_USER: dbu_abdelqodous
+      POSTGRES_PASSWORD: P@ssw0rd
+      PGDATA: /var/lib/postgressql/data
+      POSTGRES_DB: experience_db
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - 5432:5432
+    networks:
+      - spring-microservices
+    restart: unless-stopped
+
+  mail-dev:
+    container_name: mail-dev-experience
+    image: maildev/maildev
+    ports:
+      - 1080:1080
+      - 1025:1025
+
+networks:
+  spring-microservices:
+    driver: bridge
+
+volumes:
+  postgres:
+    driver: local
