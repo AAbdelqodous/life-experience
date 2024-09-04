@@ -14,6 +14,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 @Entity
 @Table(name = "_user")
 @EntityListeners(AuditingEntityListener.class)
-public class User implements UserDetails {
+public class User implements UserDetails, Principal {
     @Id
     @GeneratedValue
     private Integer id;
@@ -86,7 +87,12 @@ public class User implements UserDetails {
         return enabled;
     }
 
-    private String fullName(){
+    public String fullName(){
         return firstname + " " + lastname;
+    }
+
+    @Override
+    public String getName() {
+        return email;
     }
 }
