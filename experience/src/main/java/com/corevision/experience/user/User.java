@@ -1,7 +1,6 @@
 package com.corevision.experience.user;
 
 import com.corevision.experience.role.Role;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

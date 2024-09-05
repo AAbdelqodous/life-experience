@@ -1,6 +1,5 @@
 package com.corevision.experience.auth;
 
-import com.corevision.experience.role.Role;
 import com.corevision.experience.role.RoleRepository;
 import com.corevision.experience.security.JwtService;
 import com.corevision.experience.user.Token;
@@ -8,11 +7,16 @@ import com.corevision.experience.user.TokenRepository;
 import com.corevision.experience.user.User;
 import com.corevision.experience.user.UserRepository;
 import jakarta.mail.MessagingException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +28,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
+    private static final Logger logger = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
@@ -36,13 +41,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public void register(RegistrationRequest request) throws MessagingException {
-        Role userRole = roleRepository.findByName("USER")
+        var userRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new IllegalStateException("Role (USER) was not initialized"));
+
         User user = User.builder()
-                .firstname(request.firstname())
-                .lastname(request.lastname())
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
+                .firstname(request.getFirstname())
+                .lastname(request.getLastname())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
                 .accountLocked(false)
                 .enabled(false)
                 .roles(List.of(userRole))
@@ -53,19 +59,53 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        Authentication authenticate = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.email(),
-                        request.password()
-                )
-        );
-        var claims = new HashMap<String, Object>();
-        var user = ((User) authenticate.getPrincipal());
-        claims.put("fullName", user.fullName());
-        var jwtToken = jwtService.generateToken(claims, user);
-        return AuthenticationResponse.builder()
-                .token(jwtToken)
-                .build();
+        try {
+            logger.debug("Attempting authentication for user: {}", request.getEmail());
+
+            Authentication authenticate = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+
+            logger.debug("Authentication successful for user: {}", request.getEmail());
+
+            var claims = new HashMap<String, Object>();
+            var user = ((User) authenticate.getPrincipal());
+            claims.put("fullName", user.fullName());
+            var jwtToken = jwtService.generateToken(claims, user);
+
+            logger.debug("JWT token generated for user: {}", request.getEmail());
+
+            return AuthenticationResponse.builder()
+                    .token(jwtToken)
+                    .build();
+        } catch (BadCredentialsException e) {
+            logger.error("Authentication failed for user: {}. Bad credentials.", request.getEmail());
+            throw new RuntimeException("Invalid email or password", e);
+        } catch (Exception e) {
+            logger.error("Unexpected error during authentication for user: {}", request.getEmail(), e);
+            throw new RuntimeException("An error occurred during authentication", e);
+        }
+    }
+
+    @Transactional
+    @Override
+    public void activateAccount(String token) throws MessagingException {
+        Token savedToken = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid token"));
+        if(LocalDateTime.now().isAfter(savedToken.getExpiresAt())){
+            sendValidationEmail(savedToken.getUser());
+            throw new RuntimeException("Activation token has been expired. " +
+                    "A new one has been sent to the same Email.");
+        }
+        var user = userRepository.findById(savedToken.getUser().getId())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        user.setEnabled(true);
+        userRepository.save(user);
+        savedToken.setValidatedAt(LocalDateTime.now());
+        userRepository.save(user);
     }
 
     private void sendValidationEmail(User user) throws MessagingException {
@@ -86,7 +126,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         var token = Token.builder()
                 .token(generatedToken)
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .expiresAt(LocalDateTime.now().plusMinutes(60))
                 .user(user)
                 .build();
         tokenRepository.save(token);

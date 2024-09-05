@@ -41,6 +41,10 @@ from
   <component name="DBNavigator.Project.DatabaseSessionManager">
     <connection id="6d30e802-e641-4b94-badc-d4c3ae737def" />
   </component>
+  <component name="DBNavigator.Project.DatasetFilterManager">
+    <filter-actions connection-id="6d30e802-e641-4b94-badc-d4c3ae737def" dataset="public._user" active-filter-id="EMPTY_FILTER" />
+    <filter-actions connection-id="6d30e802-e641-4b94-badc-d4c3ae737def" dataset="public._user_roles" active-filter-id="" />
+  </component>
   <component name="DBNavigator.Project.ExecutionManager">
     <retain-sticky-names value="false" />
   </component>

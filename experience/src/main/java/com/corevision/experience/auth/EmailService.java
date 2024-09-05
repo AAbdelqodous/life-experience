@@ -3,6 +3,8 @@ package com.corevision.experience.auth;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -19,6 +21,7 @@ import static org.springframework.mail.javamail.MimeMessageHelper.*;
 @Service
 @RequiredArgsConstructor
 public class EmailService {
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
 
@@ -37,7 +40,7 @@ public class EmailService {
         }else{
             templateName = emailTemplate.name().toLowerCase();
         }
-        System.out.println("Attempting to process template: " + templateName);
+        logger.debug("Attempting to process template: {}" , templateName);
 
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(
@@ -59,6 +62,8 @@ public class EmailService {
 
         String template = templateEngine.process(templateName, context);
 
-        helper.setText(template);
+        helper.setText(template, true);
+
+        mailSender.send(mimeMessage);
     }
 }
