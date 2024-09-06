@@ -90,7 +90,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
     }
 
-    @Transactional
+    //@Transactional
     @Override
     public void activateAccount(String token) throws MessagingException {
         Token savedToken = tokenRepository.findByToken(token)
@@ -98,14 +98,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if(LocalDateTime.now().isAfter(savedToken.getExpiresAt())){
             sendValidationEmail(savedToken.getUser());
             throw new RuntimeException("Activation token has been expired. " +
-                    "A new one has been sent to the same Email.");
+                    "A new token has been sent to the same Email.");
         }
         var user = userRepository.findById(savedToken.getUser().getId())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
         user.setEnabled(true);
         userRepository.save(user);
         savedToken.setValidatedAt(LocalDateTime.now());
-        userRepository.save(user);
+        tokenRepository.save(savedToken);
     }
 
     private void sendValidationEmail(User user) throws MessagingException {
