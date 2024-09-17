@@ -7,7 +7,6 @@ import com.corevision.experience.user.TokenRepository;
 import com.corevision.experience.user.User;
 import com.corevision.experience.user.UserRepository;
 import jakarta.mail.MessagingException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +61,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             logger.debug("Attempting authentication for user: {}", request.getEmail());
 
+            // Check if user exists
+            var user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+            logger.debug("User found: {}", user.getEmail());
+
+            // Check if account is enabled and not locked
+            if (!user.isEnabled()) {
+                logger.error("Account is not enabled for user: {}", request.getEmail());
+                throw new RuntimeException("Account is not enabled");
+            }
+            if (user.isAccountLocked()) {
+                logger.error("Account is locked for user: {}", request.getEmail());
+                throw new RuntimeException("Account is locked");
+            }
+
+            logger.debug("Testing password match...");
+            boolean matches = passwordEncoder.matches(request.getPassword(), user.getPassword());
+            logger.debug("Password match result: {}", matches);
+
+            // Attempt authentication
             Authentication authenticate = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
@@ -71,8 +91,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
             logger.debug("Authentication successful for user: {}", request.getEmail());
 
+            // Generate JWT token
             var claims = new HashMap<String, Object>();
-            var user = ((User) authenticate.getPrincipal());
             claims.put("fullName", user.fullName());
             var jwtToken = jwtService.generateToken(claims, user);
 
